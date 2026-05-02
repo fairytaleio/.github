@@ -1,4 +1,13 @@
-## Hi there 👋
+# Fairytale
+
+"Facit omnia voluntas."
+fairytale.ai  
+Research Services  
+Bridgetown, St. Michael  
+
+## Repositories
+
+- [.github](https://github.com/fairytaleio/.github)
 
 <!--
 
