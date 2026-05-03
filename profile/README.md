@@ -1,6 +1,6 @@
 # Fairytale
 
-"Facit omnia voluntas."
+"Facit omnia voluntas."  
 fairytale.ai  
 Research Services  
 Bridgetown, St. Michael  
