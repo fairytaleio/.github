@@ -3,7 +3,7 @@
 "Facit omnia voluntas."  
 fairytale.ai  
 Research Services  
-Bridgetown, St. Michael  
+Bridgetown, Barbados  
 
 ## Repositories
 
