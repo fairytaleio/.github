@@ -104,7 +104,7 @@
     var el = document.getElementById('tagline-wrapper');
     if (!el) return;
 
-    var text = 'Recordando aquellos momentos.';
+    var text = '"Facit omnia voluntas."';
     var i = 0;
     el.textContent = '';
 
