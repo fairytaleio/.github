@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  /* ─── Canvas mountain renderer ─── */
+  /* ─── Canvas starry-night renderer ─── */
 
   var canvas = document.getElementById('bg-canvas');
   if (!canvas) return;
@@ -9,20 +9,87 @@
   var ctx = canvas.getContext('2d');
   var W, H;
 
+  var prefersReducedMotion = window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   var skyStops = [
-    { pos: 0.00, color: '#0f0b14' },
-    { pos: 0.35, color: '#2d1f33' },
-    { pos: 0.65, color: '#5a3a4a' },
-    { pos: 0.82, color: '#c45a4a' },
-    { pos: 1.00, color: '#d47a5a' }
+    { pos: 0.00, color: '#05060f' },
+    { pos: 0.45, color: '#0a1024' },
+    { pos: 0.75, color: '#121a38' },
+    { pos: 1.00, color: '#1c2547' }
   ];
 
-  var layers = [
-    { color: '#3d2a3d', basePct: 0.68, ampPct: 0.13, segs: 40, freq: [3, 7, 15] },
-    { color: '#2a1e30', basePct: 0.74, ampPct: 0.10, segs: 30, freq: [4, 9, 18] },
-    { color: '#1c1624', basePct: 0.80, ampPct: 0.08, segs: 24, freq: [5, 11, 20] },
-    { color: '#0f0b14', basePct: 0.86, ampPct: 0.05, segs: 16, freq: [6, 13, 22] }
-  ];
+  var starColors = ['#ffffff', '#fdf4e3', '#d6e4ff', '#cfe0ff', '#fff4cc'];
+
+  // Moon placement as fractions of the viewport so it tracks on resize.
+  var moon = { xPct: 0.78, yPct: 0.22, rPct: 0.05 };
+
+  var stars = [];
+  var craters = [];
+  var skyGradient, moonHalo, moonDisc, moonCx, moonCy, moonR;
+
+  function buildStars() {
+    stars = [];
+    var count = Math.round((W * H) / 4500);
+    if (count > 600) count = 600;
+    for (var i = 0; i < count; i++) {
+      stars.push({
+        x: Math.random(),                // fraction of W
+        y: Math.random() * 0.95,         // fraction of H
+        r: Math.random() * 1.1 + 0.3,    // radius in px
+        base: Math.random() * 0.5 + 0.4, // base brightness 0.4–0.9
+        twSpeed: Math.random() * 1.6 + 0.4,
+        twPhase: Math.random() * Math.PI * 2,
+        color: starColors[(Math.random() * starColors.length) | 0]
+      });
+    }
+  }
+
+  // Cache the gradients that only change on resize so the frame loop stays cheap.
+  function buildStatics() {
+    skyGradient = ctx.createLinearGradient(0, 0, 0, H);
+    for (var i = 0; i < skyStops.length; i++) {
+      skyGradient.addColorStop(skyStops[i].pos, skyStops[i].color);
+    }
+
+    moonCx = moon.xPct * W;
+    moonCy = moon.yPct * H;
+    moonR = moon.rPct * Math.min(W, H);
+
+    moonHalo = ctx.createRadialGradient(moonCx, moonCy, moonR * 0.6, moonCx, moonCy, moonR * 4);
+    moonHalo.addColorStop(0, 'rgba(224, 233, 255, 0.18)');
+    moonHalo.addColorStop(0.5, 'rgba(200, 215, 255, 0.05)');
+    moonHalo.addColorStop(1, 'transparent');
+
+    moonDisc = ctx.createRadialGradient(
+      moonCx - moonR * 0.3, moonCy - moonR * 0.3, moonR * 0.2,
+      moonCx, moonCy, moonR
+    );
+    moonDisc.addColorStop(0, '#fdfbf4');
+    moonDisc.addColorStop(0.7, '#e9edf7');
+    moonDisc.addColorStop(1, '#c4ccdd');
+  }
+
+  // Hand-placed craters. x/y/r are fractions of the moon radius, measured from
+  // the moon's centre, so the face stays consistent across resizes.
+  function buildCraters() {
+    var specs = [
+      [-0.30, -0.20, 0.18],
+      [ 0.24, -0.04, 0.13],
+      [ 0.04,  0.30, 0.20],
+      [-0.46,  0.24, 0.10],
+      [ 0.40,  0.34, 0.08],
+      [-0.10, -0.46, 0.07],
+      [ 0.32, -0.36, 0.06],
+      [-0.56, -0.04, 0.06],
+      [ 0.52,  0.06, 0.05],
+      [-0.02,  0.02, 0.05]
+    ];
+    craters = [];
+    for (var i = 0; i < specs.length; i++) {
+      craters.push({ x: specs[i][0], y: specs[i][1], r: specs[i][2] });
+    }
+  }
 
   function resize() {
     var dpr = window.devicePixelRatio || 1;
@@ -31,63 +98,111 @@
     canvas.width = W * dpr;
     canvas.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    draw();
+    buildStatics();
+    buildStars();
+    draw(0);
   }
 
-  function generatePoints(segs, baseY, amp, freq) {
-    var pts = [];
-    var segW = W / segs;
-    for (var i = 0; i <= segs; i++) {
-      var x = i * segW;
-      var t = i / segs;
-      var offset = 0;
-      offset += Math.sin(t * Math.PI * freq[0]) * amp * 0.45;
-      offset += Math.sin(t * Math.PI * freq[1] + 1.3) * amp * 0.30;
-      offset += Math.sin(t * Math.PI * freq[2] + 4.7) * amp * 0.15;
-      offset += (Math.random() - 0.5) * amp * 0.10;
-      pts.push({ x: x, y: baseY - amp + offset });
-    }
-    return pts;
-  }
+  function drawMoon() {
+    ctx.fillStyle = moonHalo;
+    ctx.fillRect(0, 0, W, H);
 
-  function drawMountains() {
-    for (var l = 0; l < layers.length; l++) {
-      var layer = layers[l];
-      var baseY = layer.basePct * H;
-      var amp = layer.ampPct * H;
-      var pts = generatePoints(layer.segs, baseY, amp, layer.freq);
+    ctx.beginPath();
+    ctx.arc(moonCx, moonCy, moonR, 0, Math.PI * 2);
+    ctx.fillStyle = moonDisc;
+    ctx.fill();
 
+    // Texture the face, clipped to the disc so shading never spills past the limb.
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(moonCx, moonCy, moonR, 0, Math.PI * 2);
+    ctx.clip();
+
+    for (var i = 0; i < craters.length; i++) {
+      var c = craters[i];
+      var cx = moonCx + c.x * moonR;
+      var cy = moonCy + c.y * moonR;
+      var cr = c.r * moonR;
+
+      // Concave basin: lit from upper-left, so the rim nearest the light casts a
+      // shadow into the hollow (darkest up-left) and the far wall stays brighter.
+      var basin = ctx.createRadialGradient(
+        cx + cr * 0.25, cy + cr * 0.25, cr * 0.1,
+        cx - cr * 0.10, cy - cr * 0.10, cr
+      );
+      basin.addColorStop(0, 'rgba(150, 154, 172, 0.04)');
+      basin.addColorStop(0.55, 'rgba(96, 100, 122, 0.16)');
+      basin.addColorStop(1, 'rgba(54, 58, 80, 0.32)');
+      ctx.fillStyle = basin;
       ctx.beginPath();
-      ctx.moveTo(0, H);
-      for (var i = 0; i < pts.length; i++) {
-        ctx.lineTo(pts[i].x, pts[i].y);
-      }
-      ctx.lineTo(W, H);
-      ctx.closePath();
-      ctx.fillStyle = layer.color;
+      ctx.arc(cx, cy, cr, 0, Math.PI * 2);
       ctx.fill();
+
+      // Faint highlight on the sunlit lower-right inner wall.
+      ctx.strokeStyle = 'rgba(255, 252, 244, 0.22)';
+      ctx.lineWidth = Math.max(0.4, cr * 0.12);
+      ctx.beginPath();
+      ctx.arc(cx, cy, cr * 0.82, Math.PI * -0.05, Math.PI * 0.55);
+      ctx.stroke();
     }
+
+    // Limb darkening: deepen the sphere on the side away from the light.
+    var limb = ctx.createRadialGradient(
+      moonCx - moonR * 0.3, moonCy - moonR * 0.3, moonR * 0.2,
+      moonCx, moonCy, moonR
+    );
+    limb.addColorStop(0, 'rgba(18, 22, 38, 0)');
+    limb.addColorStop(0.72, 'rgba(18, 22, 38, 0)');
+    limb.addColorStop(1, 'rgba(18, 22, 38, 0.38)');
+    ctx.fillStyle = limb;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.restore();
   }
 
-  function draw() {
-    var grad = ctx.createLinearGradient(0, 0, 0, H);
-    for (var i = 0; i < skyStops.length; i++) {
-      grad.addColorStop(skyStops[i].pos, skyStops[i].color);
+  function drawStars(time) {
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      var alpha = s.base;
+      if (!prefersReducedMotion) {
+        alpha = s.base * (0.65 + 0.35 * Math.sin(time * 0.001 * s.twSpeed + s.twPhase));
+      }
+      if (alpha < 0) alpha = 0;
+
+      var x = s.x * W;
+      var y = s.y * H;
+
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.arc(x, y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Soft halo for the brightest stars.
+      if (s.r > 1.1) {
+        ctx.globalAlpha = alpha * 0.5;
+        var glow = ctx.createRadialGradient(x, y, 0, x, y, s.r * 4);
+        glow.addColorStop(0, s.color);
+        glow.addColorStop(1, 'transparent');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(x, y, s.r * 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+  }
 
-    var cx = W * 0.5;
-    var cy = H * 0.85;
-    var rad = H * 0.4;
-    var sunGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
-    sunGrad.addColorStop(0, 'rgba(232, 201, 166, 0.25)');
-    sunGrad.addColorStop(0.4, 'rgba(196, 90, 74, 0.08)');
-    sunGrad.addColorStop(1, 'transparent');
-    ctx.fillStyle = sunGrad;
+  function draw(time) {
+    ctx.fillStyle = skyGradient;
     ctx.fillRect(0, 0, W, H);
+    drawStars(time || 0);
+    drawMoon();
+  }
 
-    drawMountains();
+  function loop(time) {
+    draw(time);
+    window.requestAnimationFrame(loop);
   }
 
   var resizeTimer;
@@ -96,7 +211,12 @@
     resizeTimer = setTimeout(resize, 120);
   });
 
+  buildCraters();
   resize();
+
+  if (!prefersReducedMotion && window.requestAnimationFrame) {
+    window.requestAnimationFrame(loop);
+  }
 
   /* ─── Typewriter ─── */
 
@@ -104,7 +224,7 @@
     var el = document.getElementById('tagline-wrapper');
     if (!el) return;
 
-    var text = '"Facit omnia voluntas."';
+    var text = 'Facit omnia voluntas.';
     var i = 0;
     el.textContent = '';
 
