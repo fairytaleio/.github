@@ -26,4 +26,8 @@ Playtest Inc.
 
 Wishlist Foundation  
 "Make a wish!"  
-[⭐](https://playtest.fairytale.ai)  
+[⭐](https://wishlist.fairytale.ai)  
+
+---
+
+© 2026 Fairytale Inc.
